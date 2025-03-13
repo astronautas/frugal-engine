@@ -292,7 +292,7 @@ wheels = [
 
 [[package]]
 name = "frugal-engine"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "deltalake", version = "0.21.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },

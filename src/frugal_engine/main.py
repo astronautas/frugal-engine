@@ -18,9 +18,10 @@ class PolarsClient:
     """
     Just an interface similar to Spark and DuckDB i.e. exposing sql, but going through UC catalog
     """
-    def __init__(self, unity_catalog_uri: str):
-        self.unity_catalog_uri = unity_catalog_uri
-        self.catalog = pl.Catalog(unity_catalog_uri, require_https=False) # last flag - for local testing
+    def __init__(self, workspace_url: str, bearer_token: str | None = None, memory_limit: int | None = None, require_https: bool = False):
+        self.unity_catalog_uri = workspace_url
+        self.catalog = pl.Catalog(workspace_url=workspace_url, bearer_token=bearer_token, require_https=require_https) # last flag - for local testing
+        self.memory_limit = memory_limit
 
     def sql(self, query: str) -> pl.DataFrame:
         tables = [table for table in sqlglot.parse_one(query).find_all(sqlglot.exp.Table)]
@@ -43,6 +44,8 @@ def setup(unity_catalog_uri: str = "http://localhost:8080", threshold: int = 6_0
     # non-invasive way to add a magic function
     get_ipython().register_magic_function(lambda line, cell=None: client.sql(line or cell),
         magic_kind="line_cell", magic_name="sequel")
+    
+    return client
                           
 def _build_local_spark_client(unity_catalog_uri: str) -> SparkSession:
     spark = SparkSession.builder \
@@ -56,6 +59,9 @@ def _build_local_spark_client(unity_catalog_uri: str) -> SparkSession:
         .config("spark.sql.catalog.unity.uri", unity_catalog_uri) \
         .config("spark.sql.catalog.unity.token", "") \
         .config("spark.sql.defaultCatalog", "unity") \
+        .config("spark.databricks.delta.catalog.update.enabled", "true") \
+        .config("spark.driver.bindAddress", "127.0.0.1") \
+        .config("spark.driver.host", "127.0.0.1") \
         .getOrCreate()
 
     return spark
@@ -128,18 +134,21 @@ class HybridClient:
     def sql(self, query: str, engine: Choice = None) -> pd.DataFrame:
         logger.debug(f"Query: {query}")
         
-        choice = self._count_heuristic(query)
+        choice = engine or self._count_heuristic(query)
         logger.debug(f"Choice: {choice}")
 
-        if (engine == Choice.POLARS) or choice == Choice.POLARS:
+        if choice == Choice.POLARS:
             try:
                 logger.info(f"Executing query in {Choice.POLARS.value}: {query}")
-                # query_transpiled = query
+                # polars - unsupported dialect, duckdb might be closest?
+                query = sqlglot.transpile(sql=query, write="duckdb")[0]
                 return self.polars_client.sql(query).to_pandas()
+            # fixme - too generic exception
             except Exception as e:
-                logger.error(f"Error: {e}, fallbacking to {Choice.SPARK.value}")
-                # query_transpiled = sqlglot.transpile(sql=query, write="spark")[0]
-                return self.spark_client.sql(query).toPandas()
+                logger.error(f"Error: {e}, fallbacking to {Choice.SPARK.value}")                
+                query = sqlglot.transpile(sql=query, write="spark")[0]
+
+            return self.spark_client.sql(query).toPandas()
         else:
             logger.info(f"Executing query in {Choice.SPARK.value}: {query}")
             return self.spark_client.sql(query).toPandas()

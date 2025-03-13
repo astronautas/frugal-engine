@@ -1,6 +1,6 @@
 [project]
 name = "frugal-engine"
-version = "0.1.0"
+version = "0.2.0"
 description = "Automatically selects either single-node or distributed execution engine based on the input data statistics. For Unity Catalog."
 readme = "README.md"
 authors = [
