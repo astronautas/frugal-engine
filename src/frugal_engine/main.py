@@ -125,10 +125,10 @@ class HybridClient:
         logger.debug(f"Top source count: {top_count}")
         
         if top_count <= self.threshold:
-            logger.info(f"{Choice.POLARS.value} has been chosen, because the top source count is less than or equal to the threshold: {self.threshold}")
+            logger.info(f"single_node_executor has been chosen, because the top source count is less than or equal to the threshold: {self.threshold}")
             return Choice.POLARS
         else:
-            logger.info(f"{Choice.SPARK.value} has been chosen, because the top source count is greater than the threshold: {self.threshold}")
+            logger.info(f"cluster_executor has been chosen, because the top source count is greater than the threshold: {self.threshold}")
             return Choice.SPARK
 
     def sql(self, query: str, engine: Choice = None) -> pd.DataFrame:
